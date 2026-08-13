@@ -4,7 +4,8 @@ node_modules/
 # Environment and Secrets
 .env
 
-# WhatsApp Session Cache
+# WhatsApp Auth and Session Cache
+.wwebjs_auth/
 .wwebjs_cache/
 
 # SQLite Database and WAL files
