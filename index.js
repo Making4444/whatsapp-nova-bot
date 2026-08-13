@@ -1,17 +1,10 @@
 import http from 'http';
 import { startBot } from './src/app.js';
 
-let latestQrUrl = null;
-let botState = 'initializing';
-
-export function setLatestQr(qr) {
-  latestQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(qr)}`;
-  botState = 'qr_ready';
-}
+let isConnected = false;
 
 export function clearLatestQr() {
-  latestQrUrl = null;
-  botState = 'ready';
+  isConnected = true;
 }
 
 const PORT = process.env.PORT || 3000;
@@ -19,29 +12,27 @@ const PORT = process.env.PORT || 3000;
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
 
-  if (botState === 'qr_ready' && latestQrUrl) {
+  if (isConnected) {
     res.end(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Scan WhatsApp QR Code</title>
+          <title>WhatsApp Nova Bot - Connected</title>
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <meta http-equiv="refresh" content="5">
           <style>
-            body { font-family: system-ui, sans-serif; text-align: center; padding: 40px 20px; background: #0f172a; color: #fff; }
-            .card { background: #1e293b; display: inline-block; padding: 30px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-            img { border: 8px solid #fff; border-radius: 12px; margin-top: 15px; }
-            h1 { font-size: 22px; color: #38bdf8; margin-bottom: 10px; }
-            p { font-size: 15px; color: #94a3b8; }
-            .badge { background: #0284c7; color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; }
+            body { font-family: system-ui, sans-serif; text-align: center; padding: 60px 20px; background: #0f172a; color: #fff; }
+            .card { background: #1e293b; display: inline-block; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-width: 400px; width: 100%; }
+            .status { display: inline-flex; align-items: center; gap: 8px; background: #166534; color: #4ade80; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; margin-bottom: 20px; }
+            .dot { width: 10px; height: 10px; background: #22c55e; border-radius: 50%; display: inline-block; }
+            h1 { font-size: 22px; color: #f8fafc; margin-bottom: 10px; }
+            p { font-size: 15px; color: #94a3b8; line-height: 1.5; }
           </style>
         </head>
         <body>
           <div class="card">
-            <span class="badge">جاهز للمسح</span>
-            <h1>افتح الواتساب واعمل مسح للـ QR Code</h1>
-            <p>افتح الواتساب من موبايلك > الأجهزة المرتبطة (Linked Devices) > ربط جهاز</p>
-            <img src="${latestQrUrl}" alt="WhatsApp QR Code" />
+            <div class="status"><span class="dot"></span> متصل بالواتساب أونلاين</div>
+            <h1>WhatsApp Nova Bot</h1>
+            <p>الكود متصل بالواتساب وشغال بنجاح 100% 🚀</p>
           </div>
         </body>
       </html>
@@ -49,54 +40,26 @@ http.createServer((req, res) => {
     return;
   }
 
-  if (botState === 'ready') {
-    res.end(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Nova Bot - Ready</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <style>
-            body { font-family: system-ui, sans-serif; text-align: center; padding: 50px 20px; background: #0f172a; color: #fff; }
-            .card { background: #1e293b; display: inline-block; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-            h1 { font-size: 24px; color: #4ade80; margin-bottom: 10px; }
-            p { font-size: 16px; color: #94a3b8; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h1>✅ WhatsApp Nova Bot is Active & Ready! 🚀</h1>
-            <p>البوت متصل بالواتساب وشغال أونلاين بنجاح 100%</p>
-          </div>
-        </body>
-      </html>
-    `);
-    return;
-  }
-
-  // Initializing state
   res.end(`
     <!DOCTYPE html>
     <html>
       <head>
-        <title>Nova Bot - Loading...</title>
+        <title>WhatsApp Nova Bot - Connecting</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta http-equiv="refresh" content="4">
         <style>
-          body { font-family: system-ui, sans-serif; text-align: center; padding: 50px 20px; background: #0f172a; color: #fff; }
-          .card { background: #1e293b; display: inline-block; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-          .spinner { border: 4px solid rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; border-left-color: #38bdf8; animation: spin 1s linear infinite; margin: 20px auto; }
-          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-          h1 { font-size: 22px; color: #38bdf8; margin-bottom: 10px; }
-          p { font-size: 15px; color: #94a3b8; }
+          body { font-family: system-ui, sans-serif; text-align: center; padding: 60px 20px; background: #0f172a; color: #fff; }
+          .card { background: #1e293b; display: inline-block; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-width: 400px; width: 100%; }
+          .status { display: inline-flex; align-items: center; gap: 8px; background: #854d0e; color: #facc15; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; margin-bottom: 20px; }
+          .dot { width: 10px; height: 10px; background: #eab308; border-radius: 50%; display: inline-block; }
+          h1 { font-size: 22px; color: #f8fafc; margin-bottom: 10px; }
+          p { font-size: 15px; color: #94a3b8; line-height: 1.5; }
         </style>
       </head>
       <body>
         <div class="card">
-          <div class="spinner"></div>
-          <h1>⏳ جاري تحميل البوت وتجهيز الـ QR Code...</h1>
-          <p>سيرفر Render يقوم الآن بفتح المتصفح وتحميل الواتساب (يستغرق من 20 إلى 40 ثانية).</p>
-          <p style="font-size:13px; color:#64748b;">هذه الصفحة تتحدث تلقائياً كل 4 ثوانٍ وسوف يظهر الـ QR كود فور جهوزيته...</p>
+          <div class="status"><span class="dot"></span> جاري الاتصال...</div>
+          <h1>WhatsApp Nova Bot</h1>
+          <p>جاري الاتصال بسيرفرات الواتساب وتأكيد الجلسة المسجلة...</p>
         </div>
       </body>
     </html>
@@ -106,7 +69,6 @@ http.createServer((req, res) => {
 });
 
 startBot({
-  onQr: (qr) => setLatestQr(qr),
   onReady: () => clearLatestQr(),
 }).catch((err) => {
   console.error('Fatal startup error:', err);
