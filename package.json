@@ -1,0 +1,18 @@
+{
+  "name": "whatsapp-nova-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "WhatsApp bot using whatsapp-web.js + Gemini API with local context memory.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node tests/text-utils.test.js && node tests/prompt-builder.test.js && node tests/relationships.test.js"
+  },
+  "dependencies": {
+    "@google/genai": "^1.28.0",
+    "dotenv": "^16.4.5",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.26.0"
+  }
+}

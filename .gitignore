@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Environment and Secrets
+.env
+
+# WhatsApp Auth and Session Cache
+.wwebjs_auth/
+.wwebjs_cache/
+
+# SQLite Database and WAL files
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Legacy database files
+database.json
+context.json
+
+# OS and Log files
+.DS_Store
+*.log
+npm-debug.log*
