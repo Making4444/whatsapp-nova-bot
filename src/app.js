@@ -381,65 +381,8 @@ export async function startBot(options = {}) {
   }
 
   async function bootstrapGroupHistory() {
-    if (configuredTargetGroupNames.size === 0) return;
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 3500));
-      const chats = await getChatsWithRetry();
-      const groups = chats.filter((c) => c.isGroup && configuredTargetGroupNames.has(sanitizeText(c.name).toLowerCase()));
-      if (groups.length === 0) {
-        logger.warn('target_group_not_found', { targetGroupNames: config.targetGroupNames });
-        return;
-      }
-
-      const bootstrapSetting = storage.getBootstrapSyncSetting(config.bootstrapLimit);
-      const fetchLimit = bootstrapSetting.type === 'all' ? Infinity : bootstrapSetting.count;
-
-      for (const group of groups) {
-        const chatId = group.id?._serialized || '';
-        if (!chatId) continue;
-        targetChatIds.add(chatId);
-
-        if (bootstrapSetting.type === 'disabled') {
-          logger.info('bootstrap_skip', {
-            targetGroupName: group.name,
-            chatId,
-            reason: 'disabled_by_set_command',
-          });
-          continue;
-        }
-
-        logger.info('bootstrap_start', {
-          targetGroupName: group.name,
-          chatId,
-          limit: bootstrapSetting.type === 'all' ? 'all' : fetchLimit,
-        });
-
-        const messages = await fetchMessagesWithRetry(group, fetchLimit);
-        const rows = [];
-        for (const m of messages) {
-          rows.push({
-            role: 'user',
-            source: 'human',
-            authorId: m.fromMe ? client.info?.wid?._serialized || null : m.author || null,
-            author: m.fromMe ? selfName : await getAuthorName(m),
-            text: sanitizeText(m.body),
-            timestamp: toIsoFromWhatsAppTimestamp(m.timestamp),
-            messageId: m.id?._serialized || null,
-          });
-        }
-
-        const inserted = storage.addMessagesBulk(chatId, rows);
-        storage.setBootstrapped(chatId);
-        logger.info('bootstrap_done', {
-          targetGroupName: group.name,
-          chatId,
-          inserted,
-          total: storage.getMessageCount(chatId),
-        });
-      }
-    } catch (err) {
-      logger.warn('bootstrap_history_soft_skip', { error: err.message || err });
-    }
+    logger.info('bootstrap_history_bypassed_for_stability', {});
+    return;
   }
 
   async function handlePrompt(msg, chatId, author, authorId, rawText) {
