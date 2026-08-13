@@ -19,8 +19,7 @@ import { createCommandRegistry } from './commands/registry.js';
 
 const { Client, LocalAuth } = whatsappWeb;
 
-export async function startBot(options = {}) {
-  const { onQr, onReady } = options;
+export async function startBot() {
   const logger = createLogger('nova-bot');
 
   const apiKey = config.geminiApiKey || (config.geminiKeys && config.geminiKeys[0]);
@@ -65,6 +64,9 @@ export async function startBot(options = {}) {
         '--no-first-run',
         '--no-zygote',
         '--disable-gpu',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
       ],
     },
   });
@@ -524,13 +526,7 @@ export async function startBot(options = {}) {
 
   client.on('qr', (qr) => {
     qrcode.generate(qr, { small: true });
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(qr)}`;
-    logger.info('qr_ready', { qrUrl });
-    console.log('\n======================================================');
-    console.log('SCAN QR CODE URL IN YOUR BROWSER:');
-    console.log(qrUrl);
-    console.log('======================================================\n');
-    if (typeof onQr === 'function') onQr(qr);
+    logger.info('qr_ready', {});
   });
 
   client.on('authenticated', () => {
@@ -542,13 +538,18 @@ export async function startBot(options = {}) {
   });
 
   client.on('ready', safeAsyncEvent('ready', async () => {
-    if (typeof onReady === 'function') onReady();
     logger.info('client_ready', {});
     try {
       if (client.info?.pushname) selfName = normalizeName(client.info.pushname);
       else if (client.info?.wid?.user) selfName = normalizeName(client.info.wid.user);
     } catch {}
     await bootstrapGroupHistory();
+
+    setInterval(async () => {
+      try {
+        await client.getState();
+      } catch {}
+    }, 30000);
   }));
 
   client.on('message_create', safeAsyncEvent('message_create', async (msg) => {
