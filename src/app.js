@@ -55,7 +55,7 @@ export async function startBot() {
     authStrategy: new LocalAuth(),
     webVersionCache: {
       type: 'remote',
-      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1042105051-alpha.html',
     },
     puppeteer: {
       headless: true,
@@ -67,8 +67,8 @@ export async function startBot() {
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
         '--no-zygote',
-        '--single-process',
         '--disable-gpu',
+        '--disable-software-rasterizer',
       ],
     },
   });
