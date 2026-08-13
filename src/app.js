@@ -247,7 +247,30 @@ export async function startBot(options = {}) {
     if (userDataDir) await removeChromiumLockFiles(userDataDir);
   }
 
+  async function removeAllSessionLockFiles() {
+    const authDir = path.resolve(process.cwd(), '.wwebjs_auth');
+    try {
+      async function cleanDir(dir) {
+        const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            await cleanDir(fullPath);
+          } else if (
+            ['SingletonLock', 'SingletonCookie', 'SingletonSocket', 'DevToolsActivePort', 'LOCK'].includes(entry.name) ||
+            entry.name.endsWith('.lock')
+          ) {
+            await fs.rm(fullPath, { force: true }).catch(() => {});
+            logger.info('removed_stale_lock_file', { file: entry.name });
+          }
+        }
+      }
+      await cleanDir(authDir);
+    } catch {}
+  }
+
   async function initializeClientWithRetry() {
+    await removeAllSessionLockFiles();
     for (let attempt = 1; attempt <= config.initRetryAttempts; attempt += 1) {
       try {
         logger.info('client_initialize_attempt', {
