@@ -54,10 +54,6 @@ export async function startBot(options = {}) {
 
   const client = new Client({
     authStrategy: new LocalAuth(),
-    webVersionCache: {
-      type: 'remote',
-      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1042105051-alpha.html',
-    },
     puppeteer: {
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
@@ -69,8 +65,6 @@ export async function startBot(options = {}) {
         '--no-first-run',
         '--no-zygote',
         '--disable-gpu',
-        '--disable-software-rasterizer',
-        '--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
       ],
     },
   });
@@ -166,21 +160,38 @@ export async function startBot(options = {}) {
   async function sendBotReply(msg, chatId, text) {
     const finalText = sanitizeText(text, { collapseWhitespace: false });
     queueAiReply(chatId, finalText);
-    const sent = await msg.reply(finalText);
-    markAiReplyId(sent?.id?._serialized);
+    try {
+      const sent = await client.sendMessage(chatId, finalText);
+      markAiReplyId(sent?.id?._serialized);
+    } catch (err) {
+      logger.warn('client_send_message_fallback', { chatId, error: err?.message || err });
+      try {
+        const sent = await msg.reply(finalText);
+        markAiReplyId(sent?.id?._serialized);
+      } catch (fallbackErr) {
+        logger.error('send_bot_reply_failed', { chatId, error: fallbackErr });
+      }
+    }
   }
 
   async function sendSystemReply(msg, chatId, text) {
     markSkipOutgoing(chatId, 1);
-    await msg.reply(sanitizeText(text, { collapseWhitespace: false }));
+    const finalText = sanitizeText(text, { collapseWhitespace: false });
+    try {
+      await client.sendMessage(chatId, finalText);
+    } catch {
+      await msg.reply(finalText).catch(() => {});
+    }
   }
 
   async function getAuthorName(msg) {
     try {
-      const contact = await msg.getContact();
-      return normalizeName(contact.pushname || contact.name || contact.number || 'Unknown');
+      if (msg.fromMe) return selfName;
+      const contact = await msg.getContact().catch(() => null);
+      const name = contact?.pushname || contact?.name || contact?.number || (typeof msg.author === 'string' ? msg.author : null) || (typeof msg.from === 'string' ? msg.from : null) || 'شخص';
+      return normalizeName(name);
     } catch {
-      return 'Unknown';
+      return 'شخص';
     }
   }
 
@@ -541,6 +552,14 @@ export async function startBot(options = {}) {
   }));
 
   client.on('message_create', safeAsyncEvent('message_create', async (msg) => {
+    logger.info('raw_message_event', {
+      from: msg.from || null,
+      to: msg.to || null,
+      fromMe: Boolean(msg.fromMe),
+      hasBody: Boolean(msg.body),
+      bodyPreview: String(msg.body || '').slice(0, 80),
+      type: msg.type || null,
+    });
     const text = sanitizeText(msg.body);
     if (!text) return;
 
