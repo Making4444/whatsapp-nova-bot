@@ -446,6 +446,13 @@ export async function startBot(options = {}) {
     const userPrompt = extractUserPrompt(rawText);
     if (userPrompt === null) return;
 
+    logger.info('trigger_detected_processing_reply', {
+      chatId,
+      author,
+      rawText,
+      userPrompt,
+    });
+
     if (!userPrompt) {
       await sendBotReply(msg, chatId, 'اكتب رسالتك وفيها اسم الاستدعاء، مثال: يا نوفا مساء الخير');
       return;
@@ -639,29 +646,17 @@ export async function startBot(options = {}) {
       });
     }
 
-    if (msg.fromMe && !isAiReply) {
+    if (!isAiReply) {
+      const hasTrigger = extractUserPrompt(text) !== null;
+      logger.info('message_received', {
+        chatId,
+        author,
+        text,
+        fromMe: Boolean(msg.fromMe),
+        hasTrigger,
+      });
       await enqueueChatTask(chatId, () => handlePrompt(msg, chatId, author, authorId, text));
     }
-  }));
-
-  client.on('message', safeAsyncEvent('message', async (msg) => {
-    const text = sanitizeText(msg.body);
-    if (!text) return;
-
-    let chat = null;
-    try {
-      chat = await msg.getChat();
-    } catch {}
-    const chatId = chat?.id?._serialized || msg.from || msg.to || 'unknown';
-    if (!isTargetGroup(chat, chatId)) return;
-    targetChatIds.add(chatId);
-    if (msg.fromMe) return;
-
-    const authorId = msg.author || null;
-    const author = await getAuthorName(msg);
-
-    if (await processCommandIfAny(msg, chat, chatId, text, author, authorId)) return;
-    await enqueueChatTask(chatId, () => handlePrompt(msg, chatId, author, authorId, text));
   }));
 
   client.on('message_revoke_everyone', safeAsyncEvent('message_revoke_everyone', async (after, before) => {
