@@ -19,7 +19,8 @@ import { createCommandRegistry } from './commands/registry.js';
 
 const { Client, LocalAuth } = whatsappWeb;
 
-export async function startBot() {
+export async function startBot(options = {}) {
+  const { onQr, onReady } = options;
   const logger = createLogger('nova-bot');
 
   const apiKey = config.geminiApiKey || (config.geminiKeys && config.geminiKeys[0]);
@@ -538,7 +539,13 @@ export async function startBot() {
 
   client.on('qr', (qr) => {
     qrcode.generate(qr, { small: true });
-    logger.info('qr_ready', {});
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(qr)}`;
+    logger.info('qr_ready', { qrUrl });
+    console.log('\n======================================================');
+    console.log('SCAN QR CODE URL IN YOUR BROWSER:');
+    console.log(qrUrl);
+    console.log('======================================================\n');
+    if (typeof onQr === 'function') onQr(qr);
   });
 
   client.on('authenticated', () => {
@@ -550,6 +557,7 @@ export async function startBot() {
   });
 
   client.on('ready', safeAsyncEvent('ready', async () => {
+    if (typeof onReady === 'function') onReady();
     logger.info('client_ready', {});
     try {
       if (client.info?.pushname) selfName = normalizeName(client.info.pushname);
