@@ -39,6 +39,7 @@ export async function startBot() {
   await storage.init();
 
   const ai = new GeminiPool({
+    keys: config.geminiKeys,
     apiKey,
     model: config.modelName,
     logger,

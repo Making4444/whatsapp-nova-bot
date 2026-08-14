@@ -50,9 +50,13 @@ export const config = {
   initRetryAttempts: Math.max(1, toInt(process.env.INIT_RETRY_ATTEMPTS, 5)),
   initRetryDelayMs: Math.max(500, toInt(process.env.INIT_RETRY_DELAY_MS, 3000)),
   adminWaIds: parseList(process.env.ADMIN_WA_IDS),
-  geminiApiKey: process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY_1 || '',
+  geminiApiKey: process.env.GEMINI_API_KEY_1 || process.env.GEMINI_API_KEY || '',
   geminiKeys: [
-    process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY_1 || process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_1,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
+    process.env.GEMINI_API_KEY_4,
+    process.env.GEMINI_API_KEY,
   ].filter(Boolean),
   tavilyKeys: [
     process.env.TAVILY_API_KEY_1,
@@ -70,7 +74,7 @@ export const config = {
   <identity>
     <name>Nova</name>
     <role>WhatsApp Bot</role>
-    <creator>Making (كريم)</creator>
+    <creator>Making (مكاري)</creator>
     <gender>Male</gender>
     <nature>Independent AI bot with a bold, witty, highly sarcastic personality that treats guys and girls completely differently.</nature>
   </identity>

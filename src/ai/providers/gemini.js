@@ -1,20 +1,43 @@
 import { GoogleGenAI } from '@google/genai';
 import { sleep } from '../../utils/common.js';
 
-export class GeminiProvider {
+export class GeminiPool {
   constructor(options) {
     this.model = options.model;
     this.logger = options.logger;
-    const key = options.apiKey || options.key || (options.keys && options.keys[0]);
-    if (!key) {
-      throw new Error('Missing Gemini API key. Set GEMINI_API_KEY in .env');
+
+    const rawKeys = options.keys || [options.apiKey || options.key].filter(Boolean);
+    const uniqueKeys = Array.from(new Set(rawKeys.map((k) => String(k || '').trim()).filter(Boolean)));
+
+    if (uniqueKeys.length === 0) {
+      throw new Error('Missing Gemini API keys. Set GEMINI_API_KEY_1..4 in .env');
     }
-    this.client = new GoogleGenAI({ apiKey: key });
+
+    this.clients = uniqueKeys.map((apiKey, index) => ({
+      index: index + 1,
+      client: new GoogleGenAI({ apiKey }),
+      apiKeyMasked: `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}`,
+    }));
+
+    this.currentIndex = 0;
+  }
+
+  get keyCount() {
+    return this.clients.length;
+  }
+
+  #getNextClient() {
+    const selected = this.clients[this.currentIndex % this.clients.length];
+    this.currentIndex = (this.currentIndex + 1) % this.clients.length;
+    return selected;
   }
 
   async generate(request) {
-    const maxAttempts = 3;
+    const totalKeys = this.clients.length;
+    const maxAttempts = totalKeys * 2;
     let lastErr = null;
+
+    let clientEntry = this.#getNextClient();
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       const payload = {
@@ -27,31 +50,36 @@ export class GeminiProvider {
 
       this.logger.info('ai_request', {
         attempt,
+        keyIndex: clientEntry.index,
+        keyCount: totalKeys,
         label: request.label || 'chat',
       });
 
       try {
-        const response = await this.client.models.generateContent(payload);
+        const response = await clientEntry.client.models.generateContent(payload);
         return {
           text: (response.text || '').trim(),
-          keyIndex: 1,
+          keyIndex: clientEntry.index,
           raw: response,
         };
       } catch (err) {
         lastErr = err;
-        this.logger.warn('ai_request_error', {
+        this.logger.warn('ai_request_key_failed', {
           attempt,
+          keyIndex: clientEntry.index,
+          error: err?.message || err,
           label: request.label || '',
-          error: err,
         });
+
+        clientEntry = this.#getNextClient();
         if (attempt < maxAttempts) {
-          await sleep(2000 * attempt);
+          await sleep(1000);
         }
       }
     }
 
-    throw lastErr || new Error('Gemini API request failed');
+    throw lastErr || new Error('All Gemini API keys in pool failed request');
   }
 }
 
-export { GeminiProvider as GeminiPool };
+export { GeminiPool as GeminiProvider };
