@@ -162,16 +162,29 @@ export async function startBot() {
   async function sendBotReply(msg, chatId, text) {
     const finalText = sanitizeText(text, { collapseWhitespace: false });
     queueAiReply(chatId, finalText);
+    const messageId = msg?.id?._serialized || null;
     try {
-      const sent = await client.sendMessage(chatId, finalText);
+      let sent = null;
+      if (messageId) {
+        sent = await client.sendMessage(chatId, finalText, {
+          quotedMessageId: messageId,
+        });
+      } else {
+        sent = await client.sendMessage(chatId, finalText);
+      }
       markAiReplyId(sent?.id?._serialized);
     } catch (err) {
-      logger.warn('client_send_message_fallback', { chatId, error: err?.message || err });
+      logger.warn('client_send_quoted_fallback', { chatId, error: err?.message || err });
       try {
         const sent = await msg.reply(finalText);
         markAiReplyId(sent?.id?._serialized);
       } catch (fallbackErr) {
-        logger.error('send_bot_reply_failed', { chatId, error: fallbackErr });
+        try {
+          const sent = await client.sendMessage(chatId, finalText);
+          markAiReplyId(sent?.id?._serialized);
+        } catch (finalErr) {
+          logger.error('send_bot_reply_failed', { chatId, error: finalErr });
+        }
       }
     }
   }
@@ -179,10 +192,19 @@ export async function startBot() {
   async function sendSystemReply(msg, chatId, text) {
     markSkipOutgoing(chatId, 1);
     const finalText = sanitizeText(text, { collapseWhitespace: false });
+    const messageId = msg?.id?._serialized || null;
     try {
-      await client.sendMessage(chatId, finalText);
+      if (messageId) {
+        await client.sendMessage(chatId, finalText, {
+          quotedMessageId: messageId,
+        });
+      } else {
+        await client.sendMessage(chatId, finalText);
+      }
     } catch {
-      await msg.reply(finalText).catch(() => {});
+      await msg.reply(finalText).catch(() => {
+        return client.sendMessage(chatId, finalText).catch(() => {});
+      });
     }
   }
 
@@ -329,17 +351,14 @@ export async function startBot() {
   async function resolveChatContext(...messages) {
     const items = messages.filter(Boolean);
     for (const item of items) {
-      try {
-        if (typeof item.getChat === 'function') {
-          const chat = await item.getChat();
-          const chatId = chat?.id?._serialized || item.from || item.to || null;
-          if (chatId) return { chat, chatId };
-        }
-      } catch {}
-    }
-    for (const item of items) {
-      const chatId = item?.from || item?.to || item?.id?.remote || null;
-      if (chatId) return { chat: null, chatId };
+      const chatId = item?.id?.remote || (item.fromMe ? item.to : item.from) || null;
+      if (chatId) {
+        let chat = null;
+        try {
+          if (typeof item.getChat === 'function') chat = await item.getChat();
+        } catch {}
+        return { chat, chatId };
+      }
     }
     return { chat: null, chatId: null };
   }
@@ -568,11 +587,13 @@ export async function startBot() {
     try {
       chat = await msg.getChat();
     } catch {}
-    const chatId = chat?.id?._serialized || msg.from || msg.to || 'unknown';
+    const chatId = msg.id?.remote || (msg.fromMe ? msg.to : msg.from) || chat?.id?._serialized || 'unknown';
     if (!isTargetGroup(chat, chatId)) return;
     targetChatIds.add(chatId);
 
-    const authorId = msg.fromMe ? client.info?.wid?._serialized || null : msg.author || null;
+    const authorId = msg.fromMe
+      ? client.info?.wid?._serialized || null
+      : msg.author || msg.from || null;
     const author = msg.fromMe ? selfName : await getAuthorName(msg);
 
     if (await processCommandIfAny(msg, chat, chatId, text, author, authorId)) return;
