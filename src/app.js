@@ -11,7 +11,7 @@ import {
   sanitizeText,
 } from './utils/text.js';
 import { SqliteStorage } from './storage/sqlite.js';
-import { GeminiPool } from './ai/providers/gemini.js';
+import { OpenRouterProvider } from './ai/providers/openrouter.js';
 import { SearchProvider } from './ai/providers/search.js';
 import { buildPromptPayload, formatHistoryLines } from './ai/promptBuilder.js';
 import { applyRelationshipFromMessage, extractLongMemoryFacts } from './memory/relationships.js';
@@ -22,9 +22,9 @@ const { Client, LocalAuth } = whatsappWeb;
 export async function startBot() {
   const logger = createLogger('nova-bot');
 
-  const apiKey = config.geminiApiKey || (config.geminiKeys && config.geminiKeys[0]);
+  const apiKey = config.openrouterApiKey;
   if (!apiKey) {
-    throw new Error('Missing Gemini API key. Set GEMINI_API_KEY or GEMINI_API_KEY_1 in .env');
+    throw new Error('Missing OpenRouter API key. Set OPENROUTER_API_KEY in .env');
   }
 
   const storage = new SqliteStorage({
@@ -38,8 +38,7 @@ export async function startBot() {
   });
   await storage.init();
 
-  const ai = new GeminiPool({
-    keys: config.geminiKeys,
+  const ai = new OpenRouterProvider({
     apiKey,
     model: config.modelName,
     logger,
