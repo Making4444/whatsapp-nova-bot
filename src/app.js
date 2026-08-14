@@ -162,50 +162,40 @@ export async function startBot() {
   async function sendBotReply(msg, chatId, text) {
     const finalText = sanitizeText(text, { collapseWhitespace: false });
     queueAiReply(chatId, finalText);
-    const messageId = msg?.id?._serialized || null;
     try {
-      let sent = null;
-      if (messageId) {
-        sent = await client.sendMessage(chatId, finalText, {
-          quotedMessageId: messageId,
-        });
-      } else {
-        sent = await client.sendMessage(chatId, finalText);
-      }
-      markAiReplyId(sent?.id?._serialized);
-    } catch (err) {
-      logger.warn('client_send_quoted_fallback', { chatId, error: err?.message || err });
-      try {
+      if (msg && typeof msg.reply === 'function') {
         const sent = await msg.reply(finalText);
         markAiReplyId(sent?.id?._serialized);
-      } catch (fallbackErr) {
-        try {
-          const sent = await client.sendMessage(chatId, finalText);
-          markAiReplyId(sent?.id?._serialized);
-        } catch (finalErr) {
-          logger.error('send_bot_reply_failed', { chatId, error: finalErr });
-        }
+        return;
       }
+    } catch (err) {
+      logger.warn('msg_reply_failed_trying_send_message', { chatId, error: err?.message || err });
+    }
+
+    try {
+      const messageId = msg?.id?._serialized || null;
+      const options = messageId ? { quotedMessageId: messageId } : {};
+      const sent = await client.sendMessage(chatId, finalText, options);
+      markAiReplyId(sent?.id?._serialized);
+    } catch (finalErr) {
+      logger.error('send_bot_reply_failed', { chatId, error: finalErr });
     }
   }
 
   async function sendSystemReply(msg, chatId, text) {
     markSkipOutgoing(chatId, 1);
     const finalText = sanitizeText(text, { collapseWhitespace: false });
-    const messageId = msg?.id?._serialized || null;
     try {
-      if (messageId) {
-        await client.sendMessage(chatId, finalText, {
-          quotedMessageId: messageId,
-        });
-      } else {
-        await client.sendMessage(chatId, finalText);
+      if (msg && typeof msg.reply === 'function') {
+        await msg.reply(finalText);
+        return;
       }
-    } catch {
-      await msg.reply(finalText).catch(() => {
-        return client.sendMessage(chatId, finalText).catch(() => {});
-      });
-    }
+    } catch {}
+    try {
+      const messageId = msg?.id?._serialized || null;
+      const options = messageId ? { quotedMessageId: messageId } : {};
+      await client.sendMessage(chatId, finalText, options);
+    } catch {}
   }
 
   async function getAuthorName(msg) {

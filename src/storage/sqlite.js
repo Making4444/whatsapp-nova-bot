@@ -77,6 +77,22 @@ export class SqliteStorage {
     this.db.exec('PRAGMA foreign_keys = ON;');
     this.#createSchema();
     await this.#migrateLegacyIfNeeded();
+    await this.syncFromMembersJsonFile();
+  }
+
+  async syncFromMembersJsonFile() {
+    const fileData = await readJsonSafe(this.membersPath);
+    if (fileData && Array.isArray(fileData.members)) {
+      const items = fileData.members
+        .map((item) => ({
+          accountName: normalizeName(item.accountName || item.displayName || ''),
+          realName: sanitizeText(item.realName || ''),
+        }))
+        .filter((item) => item.accountName);
+      if (items.length > 0) {
+        this.replaceMembersSync(items);
+      }
+    }
   }
 
   #createSchema() {
