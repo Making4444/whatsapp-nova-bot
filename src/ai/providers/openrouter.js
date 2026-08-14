@@ -23,9 +23,27 @@ export class OpenRouterProvider {
       });
     }
 
-    const userContent = typeof request.contents === 'string'
-      ? request.contents
-      : JSON.stringify(request.contents);
+    let userContent = null;
+    if (Array.isArray(request.images) && request.images.length > 0) {
+      const textContent = typeof request.contents === 'string'
+        ? request.contents
+        : JSON.stringify(request.contents);
+
+      const contentParts = [{ type: 'text', text: textContent }];
+      for (const imgUrl of request.images) {
+        if (imgUrl) {
+          contentParts.push({
+            type: 'image_url',
+            image_url: { url: imgUrl },
+          });
+        }
+      }
+      userContent = contentParts;
+    } else {
+      userContent = typeof request.contents === 'string'
+        ? request.contents
+        : JSON.stringify(request.contents);
+    }
 
     messages.push({
       role: 'user',
@@ -36,6 +54,7 @@ export class OpenRouterProvider {
       this.logger.info('ai_request', {
         attempt,
         model: this.model,
+        hasImages: Boolean(request.images && request.images.length > 0),
         label: request.label || 'chat',
       });
 
@@ -51,6 +70,10 @@ export class OpenRouterProvider {
           body: JSON.stringify({
             model: this.model,
             messages,
+            temperature: request.temperature ?? 0.85,
+            top_p: 0.95,
+            frequency_penalty: 0.35,
+            presence_penalty: 0.25,
           }),
         });
 

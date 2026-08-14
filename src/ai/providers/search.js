@@ -27,17 +27,48 @@ function toSearchTextFromSerper(data) {
 }
 
 export function needsWebSearch(prompt) {
-  return /(ابحث|دور|فتش|على النت|على الانترنت|الانترنت|latest|search|google|خبر|اخبار|سعر|معلومة حديثة|دلوقتي|النهارده)/i.test(
-    prompt,
+  if (!prompt || typeof prompt !== 'string') return false;
+  const text = prompt.toLowerCase();
+
+  // 1. Explicit search triggers
+  const explicitSearch = /(ابحث|دور|فتش|سيرش|جوجل|جوجله|على النت|على الانترنت|الانترنت|search|google|lookup)/i;
+
+  // 2. Real-time & News triggers
+  const newsAndEvents = /(خبر|اخبار|ايه اللي حصل|تريند|ترند|حادث|مؤتمر|قرار|بيان|زلزال|حرب|وفاة|مات|وفاه|news|latest)/i;
+
+  // 3. Temporal triggers (today, yesterday, now, 2025/2026)
+  const temporal = /(النهارده|النهاردة|اليوم|امبارح|امس|أمس|بكرة|بكرا|غدا|دلوقتي|حاليا|الان|السنة دي|2025|2026|احدث|أحدث|آخر اخبار|اخر اخبار)/i;
+
+  // 4. Prices, currencies, financial, commodities
+  const pricesAndFinance = /(سعر|اسعار|أسعار|الدولار|الذهب|الريال|اليورو|العملات|بكام|كام سعر|بورصة|اسهم|أسهم|بيتكوين|crypto|price|سعر جرام)/i;
+
+  // 5. Sports, scores, matches, tournaments
+  const sports = /(ماتش|مباراة|مباريات|نتيجة|دوري|اهداف|أهداف|ترتيب|كأس|مين كسب|مين فاز|تشكيل|الاهلي|الأهلي|الزمالك|ريال مدريد|برشلونة|ليفربول|مانشستر|صلاح|ميسي|رونالدو)/i;
+
+  // 6. Weather & Temperature
+  const weather = /(طقس|درجة الحرارة|درجه الحراره|الجو|مطر|أخبار الطقس)/i;
+
+  // 7. Product releases, movies, releases
+  const releases = /(موعد نزول|تاريخ نزول|سعر تليفون|مواصفات|ايفون|سامسونج|شاومي|فيلم|مسلسل|اغنية|أغنية)/i;
+
+  return (
+    explicitSearch.test(text) ||
+    newsAndEvents.test(text) ||
+    (temporal.test(text) && (pricesAndFinance.test(text) || sports.test(text) || newsAndEvents.test(text) || weather.test(text) || /(مين|ايه|كام|فين|ازاي)/i.test(text))) ||
+    pricesAndFinance.test(text) ||
+    sports.test(text) ||
+    weather.test(text) ||
+    releases.test(text)
   );
 }
 
 export function extractSearchQuery(prompt) {
   const cleaned = sanitizeText(prompt)
-    .replace(/^يا\s*نوفا/i, '')
-    .replace(/^ي\s*نوفا/i, '')
-    .replace(/^(ابحث|دور|فتش)\s*(عن)?/i, '')
-    .replace(/على\s*(ال)?(نت|الانترنت)/i, '')
+    .replace(/^(يا\s*نوفا|ي\s*نوفا|نوفا)/i, '')
+    .replace(/(يا\s*نوفا|ي\s*نوفا|نوفا)$/i, '')
+    .replace(/^(يا\s*عم|بقولك\s*ايه|قولي|عايز\s*اعرف|هو|هي|لو\s*سمحت|بالله\s*عليك)\s*/i, '')
+    .replace(/^(ابحث|دور|فتش|سيرش|جوجل)\s*(عن|على|لي)?\s*/i, '')
+    .replace(/على\s*(ال)?(نت|الانترنت|جوجل)/i, '')
     .trim();
   return cleaned || sanitizeText(prompt);
 }
@@ -152,4 +183,3 @@ export class SearchProvider {
     return { used: false, provider: '', context: '' };
   }
 }
-

@@ -1,4 +1,5 @@
 import { normalizeName, sanitizeText } from '../utils/text.js';
+import { computeMoodDescription } from '../memory/relationships.js';
 
 function toStableKey(message) {
   if (message.messageId) return `mid:${message.messageId}`;
@@ -133,11 +134,15 @@ function buildMembersSection(storage) {
 
 function buildRelationshipSection(storage, chatId, author) {
   const current = storage.getRelationship(chatId, author);
+  const mood = computeMoodDescription(current.affinity, current.trust);
   const top = storage.topRelationships(chatId, 8);
   const topLines = top.map((r) => `- ${r.accountName}: affinity=${Math.round(r.affinity)}, trust=${Math.round(r.trust)}`);
-  return `\n\nRelationship state:\nCurrent speaker (${normalizeName(author)}): affinity=${Math.round(
-    current.affinity,
-  )}, trust=${Math.round(current.trust)}\nTop relations:\n${topLines.join('\n') || '- no data yet'}`;
+  return `\n\n[EMOTIONAL STATE & RELATIONSHIP WITH ${normalizeName(author)}]:
+- Affinity Score: ${Math.round(current.affinity)} / 100
+- Trust Score: ${Math.round(current.trust)} / 100
+- Emotional Mood: ${mood.title}
+- Nova Emotional Guidance: ${mood.promptRule}
+\nTop Group Relations:\n${topLines.join('\n') || '- no data yet'}`;
 }
 
 function buildLongMemorySection(storage, chatId, author) {
@@ -169,21 +174,21 @@ export function buildPromptPayload(storage, chatId, options) {
   const contextText = buildContextText(selected.messages);
   const chatContextSection = `Current Chat Context:\n- Type: ${isGroup ? 'Group Chat' : 'Private Direct Message (DM)'}\n- Name: ${chatName || (isGroup ? 'Group' : author)}\n- Chat ID: ${chatId}`;
   const quotedSection = quotedInfo
-    ? `\n\nQuoted message in current request:\nAuthor: ${quotedInfo.author}\nTime: ${
-        quotedInfo.timestamp || 'Unknown'
-      }\nText: ${quotedInfo.text || ''}`
+    ? `\n\n[DIRECT REPLY / QUOTED MESSAGE CONTEXT]\n${author} is quoting and replying directly to this specific message:\n- Quoted Message Author: ${quotedInfo.author}\n- Quoted Message Time: ${quotedInfo.timestamp || 'Unknown'}\n- Quoted Message Text: "${quotedInfo.text || ''}"\n-> Nova instruction: You must respond directly with reference to this quoted message and answer ${author}'s point accurately!`
     : '';
   const membersSection = buildMembersSection(storage);
   const relationshipSection = buildRelationshipSection(storage, chatId, author);
   const longMemorySection = buildLongMemorySection(storage, chatId, author);
   const searchSection = searchResult?.used
-    ? `\n\nInternet search results (${searchResult.provider}):\n${searchResult.context}`
+    ? `\n\n[LIVE INTERNET SEARCH RESULTS (${searchResult.provider})]:\n${searchResult.context}\n-> Nova instruction: Use these live search results to provide accurate, up-to-date facts in your Egyptian response.`
     : '';
   const truncationNote = selected.truncated
-    ? '\n\n[Note: context was trimmed to keep prompt within limit.]'
+    ? '\n\n[Note: older history was trimmed to keep context fast and fresh.]'
     : '';
 
-  const prompt = `${chatContextSection}\n\nConversation so far:\n${contextText}${quotedSection}${membersSection}${relationshipSection}${longMemorySection}${searchSection}${truncationNote}\n\nUser request (latest message): ${author}: ${userPrompt}`;
+  const userRequestSection = `\n\n[CURRENT USER REQUEST]\n- Sender: ${author}\n- User Prompt: "${userPrompt || '(User called "يا نوفا" to get your attention)'}"\n- Guidance: If ${author} wrote consecutive messages or statements in the conversation history just before calling you, connect all parts logically and answer their complete question naturally without asking them to repeat themselves.`;
+
+  const prompt = `${chatContextSection}\n\nConversation History:\n${contextText}${quotedSection}${membersSection}${relationshipSection}${longMemorySection}${searchSection}${truncationNote}${userRequestSection}`;
   return {
     prompt,
     contextCount: selected.messages.length,

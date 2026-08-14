@@ -326,12 +326,27 @@ export async function startBot() {
       const mapped = storage.findMessageById(chatId, quotedId);
       const author = mapped?.author || (quoted.fromMe ? selfName : await getAuthorName(quoted));
       const timestamp = mapped?.timestamp || (quoted.timestamp ? new Date(quoted.timestamp * 1000).toISOString() : null);
-      const text = mapped?.text || sanitizeText(quoted.body);
+      let text = mapped?.text || sanitizeText(quoted.body);
+
+      let imageBase64 = null;
+      if (quoted.hasMedia) {
+        try {
+          const media = await quoted.downloadMedia();
+          if (media?.data && (media?.mimetype?.startsWith('image/') || media?.mimetype?.startsWith('sticker/'))) {
+            imageBase64 = `data:${media.mimetype};base64,${media.data}`;
+            if (!text) text = '[صورة مرفقة]';
+          }
+        } catch (mediaErr) {
+          logger.warn('download_quoted_media_error', { error: mediaErr?.message });
+        }
+      }
+
       return {
         messageId: quotedId,
         author,
         text,
         timestamp,
+        imageBase64,
       };
     } catch {
       return null;
@@ -418,12 +433,7 @@ export async function startBot() {
       userPrompt,
     });
 
-    if (!userPrompt) {
-      await sendBotReply(msg, chatId, 'اكتب رسالتك وفيها اسم الاستدعاء، مثال: يا نوفا مساء الخير');
-      return;
-    }
-
-    const requestedCount = parseLastCount(userPrompt);
+    const requestedCount = userPrompt ? parseLastCount(userPrompt) : null;
     if (requestedCount) {
       const history = storage.getMessages(chatId, { limit: requestedCount });
       if (history.length === 0) {
@@ -447,13 +457,39 @@ export async function startBot() {
 
     const contextLimit = storage.getContextLimit(config.defaultContextLimit);
     const quotedInfo = await extractQuotedInfo(msg, chatId);
-    const searchResult = await searchProvider.run(userPrompt);
+
+    // Multimodal vision: collect images from current message and quoted message
+    const images = [];
+    if (msg.hasMedia) {
+      try {
+        const media = await msg.downloadMedia();
+        if (media?.data && (media?.mimetype?.startsWith('image/') || media?.mimetype?.startsWith('sticker/'))) {
+          images.push(`data:${media.mimetype};base64,${media.data}`);
+        }
+      } catch (err) {
+        logger.warn('download_msg_media_failed', { error: err?.message });
+      }
+    }
+    if (quotedInfo?.imageBase64) {
+      images.push(quotedInfo.imageBase64);
+    }
+
+    let effectivePrompt = userPrompt || '';
+    if (!effectivePrompt && images.length > 0) {
+      effectivePrompt = 'شوف الصورة دي وعلق عليها';
+    }
+
+    let searchTarget = effectivePrompt || '';
+    if (quotedInfo?.text) {
+      searchTarget = `${searchTarget} ${quotedInfo.text}`.trim();
+    }
+    const searchResult = await searchProvider.run(searchTarget);
 
     const promptPayload = buildPromptPayload(storage, chatId, {
       author,
       chatName,
       isGroup,
-      userPrompt,
+      userPrompt: effectivePrompt,
       quotedInfo,
       contextLimit,
       searchResult,
@@ -468,11 +504,13 @@ export async function startBot() {
       contextCount: promptPayload.contextCount,
       truncated: promptPayload.truncated,
       searchUsed: searchResult.used,
+      imagesCount: images.length,
     });
 
     try {
       const response = await ai.generate({
         contents: promptPayload.prompt,
+        images,
         systemInstruction: config.systemPrompt,
         label: 'chat_reply',
       });
@@ -570,7 +608,10 @@ export async function startBot() {
       bodyPreview: String(msg.body || '').slice(0, 80),
       type: msg.type || null,
     });
-    const text = sanitizeText(msg.body);
+    let text = sanitizeText(msg.body);
+    if (!text && msg.hasMedia) {
+      text = '[صورة مرفقة]';
+    }
     if (!text) return;
 
     let chat = null;
