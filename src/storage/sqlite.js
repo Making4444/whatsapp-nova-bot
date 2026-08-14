@@ -453,6 +453,14 @@ export class SqliteStorage {
     return rowToMessage(row);
   }
 
+  clearChatMessages(chatId) {
+    if (!chatId) return 0;
+    const result = this.db
+      .prepare('DELETE FROM messages WHERE chat_id = ?')
+      .run(chatId);
+    return Number(result?.changes || 0);
+  }
+
   deleteMessageById(chatId, messageId) {
     if (!chatId || !messageId) return 0;
     const result = this.db

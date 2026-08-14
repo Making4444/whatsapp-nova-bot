@@ -130,10 +130,24 @@ export function createCommandRegistry(deps) {
     return true;
   }
 
+  async function handleClear(text, ctx) {
+    const raw = String(text || '').trim().toLowerCase();
+    if (raw !== '/clear' && raw !== '/reset') return false;
+
+    if (!isAdmin(ctx.authorId)) {
+      await ctx.reply('الأمر ده للادمن بس.');
+      return true;
+    }
+
+    const deleted = storage.clearChatMessages(ctx.chatId);
+    await ctx.reply(`تم مسح سجل المحادثة بنجاح (${deleted} رسالة). هنبدأ من جديد على نضافة! 🧹✨`);
+    return true;
+  }
+
   async function handleHelp(text, ctx) {
     if (!parseHelpCommand(text)) return false;
     await ctx.reply(
-      '/edit <number|all>\n/set false|all|<number>\n/member\n/status\n/mood\n/mood <accountName> <value -100..100>\n/help',
+      '/edit <number|all>\n/set false|all|<number>\n/member\n/status\n/mood\n/mood <accountName> <value -100..100>\n/clear\n/help',
     );
     return true;
   }
@@ -141,7 +155,7 @@ export function createCommandRegistry(deps) {
   return {
     async handle(ctx) {
       const text = ctx.text;
-      const handlers = [handleEdit, handleSet, handleMember, handleStatus, handleMood, handleHelp];
+      const handlers = [handleEdit, handleSet, handleMember, handleStatus, handleMood, handleClear, handleHelp];
       for (const handler of handlers) {
         const handled = await handler(text, ctx);
         if (handled) return true;
@@ -150,4 +164,3 @@ export function createCommandRegistry(deps) {
     },
   };
 }
-
